@@ -18,11 +18,11 @@ RUN mkdir .ssh && chmod 700 .ssh
 RUN echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDfji/gkqLV5YAC2UFuE4OK3XeGtCGzWdRUYpByVVk4MHiVseLq2gmi5MN+A8k6a4xYX4knse2Ps94Md4WfcA2dHjykLs5vqmK+CqLa+OI7Ls4C9LmY/S0RgQz+Fq4WO28vVwDjje3yG+1q5mP42y45sR5i9U0sF4KOVXI+gsysOZqJPmKEFBuFYrM7qxrMMj2raKw00Mqfw0e9o/n+5ycl/YPr7gN9OqzDAmI0Wkr1441zjpk7ygrjsW7tSKeP0HXRCb8yeE0rLXEmhO1HVa7NEzkCEknZT9GlqkxM1ZcBFZszOCsy2x2ZRuIcccFNYUDhdKAgv0xJNOyqpl3tvxPN kadriansyah@192.168.1.7" > /home/grumpycat/.ssh/authorized_keys
 RUN chmod 600 .ssh/authorized_keys
 
-# # configure sshd
-# RUN sudo apt-get update && sudo apt-get install -y openssh-server
-# RUN sudo sed -i 's/Port 22/Port 3006/' /etc/ssh/sshd_config
-# RUN sudo sed -i 's/PermitRootLogin without-password/PermitRootLogin no/' /etc/ssh/sshd_config
-# RUN sudo cat /etc/ssh/sshd_config
+# configure sshd
+RUN sudo apt-get update && sudo apt-get install -y openssh-server
+RUN sudo sed -i 's/Port 22/Port 3006/' /etc/ssh/sshd_config
+RUN sudo sed -i 's/PermitRootLogin without-password/PermitRootLogin no/' /etc/ssh/sshd_config
+RUN sudo cat /etc/ssh/sshd_config
 
 # install wget
 RUN sudo apt-get update && sudo apt-get install -y wget
