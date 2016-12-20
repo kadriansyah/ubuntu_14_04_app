@@ -2,6 +2,8 @@
 FROM ubuntu:14.04
 MAINTAINER Kiagus Arief Adriansyah <kadriansyah@gmail.com>
 
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+
 # creating user grumpycat
 RUN useradd -ms /bin/bash grumpycat
 RUN gpasswd -a grumpycat sudo
@@ -26,10 +28,17 @@ RUN sudo cat /etc/ssh/sshd_config
 
 # install wget
 RUN sudo apt-get update && sudo apt-get install -y wget
-#
-# # solve issue: dpkg-preconfigure: unable to re-open stdin:
-# ARG DEBIAN_FRONTED=noninteractive
-#
+
+# install anaconda
+USER root
+WORKDIR /home/grumpycat
+RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
+    wget https://repo.continuum.io/archive/Anaconda3-4.2.0-Linux-x86_64.sh -O /home/grumpycat/anaconda.sh && \
+    /bin/bash /home/grumpycat/anaconda.sh -b -p /opt/conda && \
+    rm /home/grumpycat/anaconda.sh
+USER grumpycat
+WORKDIR /home/grumpycat
+
 # Configure NTP Synchronization
 RUN sudo apt-get update && sudo apt-get install -y ntp
 
