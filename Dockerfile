@@ -85,6 +85,10 @@ RUN cd redis-stable && make && sudo make install && cd utils && sudo ./install_s
 # forward request and error logs to docker log collector
 RUN sudo ln -sf /dev/stdout /var/log/nginx/access.log && sudo ln -sf /dev/stderr /var/log/nginx/error.log
 
+COPY start_script.sh /home/grumpycat/
+RUN sudo chown grumpycat.grumpycat /home/grumpycat/start_script.sh && sudo chmod 755 /home/grumpycat/start_script.sh
+RUN echo 'export TERM=xterm' >> ~/.bashrc
+
 # Expose port 80 from the container to the host
 EXPOSE 80 443
-CMD ["sudo","nginx", "-g", "daemon off;"]
+ENTRYPOINT ["./start_script.sh"]
