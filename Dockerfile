@@ -1,4 +1,4 @@
-# This is a comment
+# image name: kadriansyah/ubuntu_14_04_app:v1
 FROM ubuntu:14.04
 MAINTAINER Kiagus Arief Adriansyah <kadriansyah@gmail.com>
 
@@ -24,7 +24,6 @@ RUN chmod 600 .ssh/authorized_keys
 RUN sudo apt-get update && sudo apt-get install -y openssh-server
 RUN sudo sed -i 's/Port 22/Port 3006/' /etc/ssh/sshd_config
 RUN sudo sed -i 's/PermitRootLogin without-password/PermitRootLogin no/' /etc/ssh/sshd_config
-RUN sudo cat /etc/ssh/sshd_config
 
 # install wget
 RUN sudo apt-get update && sudo apt-get install -y wget
@@ -39,12 +38,8 @@ RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
 USER grumpycat
 WORKDIR /home/grumpycat
 
-# Configure NTP Synchronization
-RUN sudo apt-get update && sudo apt-get install -y ntp
-
-# install htop
-RUN sudo apt-get update && sudo apt-get install -y htop
-RUN sudo apt-get update && sudo apt-get install -y git
+# Configure NTP Synchronization, htop, git, curl
+RUN sudo apt-get update && sudo apt-get install -y ntp && sudo apt-get install -y htop && sudo apt-get install -y git && sudo apt-get install -y curl libcurl3 libcurl3-dev
 
 # NodeJS Debian and Ubuntu based Linux distributions
 RUN sudo sudo apt-get update && sudo apt-get install -y build-essential
@@ -62,17 +57,18 @@ RUN sudo \
     sudo rm -rf /var/cache/oracle-jdk8-installer
 
 # install passenger
-RUN sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 561F9B9CAC40B2F7
+RUN sudo apt-get update && sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 561F9B9CAC40B2F7
 RUN sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates
 RUN sudo sh -c 'echo deb https://oss-binaries.phusionpassenger.com/apt/passenger trusty main > /etc/apt/sources.list.d/passenger.list'
 RUN sudo apt-get update && sudo apt-get install -y nginx-extras passenger
 
 # install rvm
-RUN sudo apt-get update && sudo gpg --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3
+# RUN sudo apt-get update && sudo gpg --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3
+RUN curl -#LO https://rvm.io/mpapis.asc && gpg --import mpapis.asc
 RUN \curl -sSL https://get.rvm.io | bash -s stable
-RUN source ~/.rvm/scripts/rvm
-RUN rvm install 2.3.3
-RUN rvm use 2.3.3 --default
+RUN /bin/bash -c "source ~/.rvm/scripts/rvm"
+RUN /bin/bash -l -c "rvm install 2.3.3"
+RUN /bin/bash -l -c "rvm use 2.3.3 --default"
 
 # Install Elasticsearch.
 ENV DEB_PACKAGE elasticsearch-5.1.1.deb
@@ -86,7 +82,9 @@ RUN wget http://download.redis.io/releases/redis-stable.tar.gz
 RUN tar xvzf redis-stable.tar.gz
 RUN cd redis-stable && make && sudo make install && cd utils && sudo ./install_server.sh
 
-# firewall
-RUN sudo apt-get update && sudo apt-get install -y ufw
-RUN sudo ufw allow 3006/tcp
-RUN sudo ufw allow 80/tcp
+# forward request and error logs to docker log collector
+RUN sudo ln -sf /dev/stdout /var/log/nginx/access.log && sudo ln -sf /dev/stderr /var/log/nginx/error.log
+
+# Expose port 80 from the container to the host
+EXPOSE 80 443
+CMD ["sudo","nginx", "-g", "daemon off;"]
