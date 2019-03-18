@@ -3,6 +3,45 @@ FROM  ubuntu:16.04
 LABEL version="1.0"
 LABEL maintainer="Kiagus Arief Adriansyah <kadriansyah@gmail.com>"
 
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		ca-certificates \
+		jq \
+		numactl \
+	; \
+	if ! command -v ps > /dev/null; then \
+		apt-get install -y --no-install-recommends procps; \
+	fi; \
+	rm -rf /var/lib/apt/lists/*
+
+# grab gosu for easy step-down from root (https://github.com/tianon/gosu/releases)
+ENV GOSU_VERSION 1.10
+
+RUN set -ex; \
+	\
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		wget \
+	; \
+	if ! command -v gpg > /dev/null; then \
+		apt-get install -y --no-install-recommends gnupg dirmngr; \
+	fi; \
+	rm -rf /var/lib/apt/lists/*; \
+	\
+	dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
+	wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch"; \
+	wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc"; \
+	export GNUPGHOME="$(mktemp -d)"; \
+	gpg --batch --keyserver ha.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
+	gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu; \
+	command -v gpgconf && gpgconf --kill all || :; \
+	rm -r "$GNUPGHOME" /usr/local/bin/gosu.asc; \
+	chmod +x /usr/local/bin/gosu; \
+	gosu nobody true; \
+	\
+	apt-get purge -y --auto-remove wget
+
 ENV NGINX_VERSION 1.15.9-1~xenial
 ENV NJS_VERSION   1.15.9.0.2.8-1~xenial
 
@@ -96,6 +135,9 @@ RUN set -x \
     && apt-get install -yqq apt-transport-https ca-certificates \
     && sh -c 'echo deb https://oss-binaries.phusionpassenger.com/apt/passenger xenial main > /etc/apt/sources.list.d/passenger.list' \
     && apt-get update && apt-get install -yqq nginx-extras passenger
+
+# custom nginx.conf
+COPY nginx.conf /etc/nginx/
 
 # nodejs
 RUN set -x && apt-get install -yqq curl
@@ -213,22 +255,11 @@ RUN set -ex \
 	&& make -j "$(nproc)" \
 	&& make install \
 	\
-	&& apt-get purge -yqq --auto-remove $buildDeps \
+	# && apt-get purge -yqq --auto-remove $buildDeps \
 	&& cd / \
 	&& rm -r /usr/src/ruby \
 # rough smoke test
 	&& ruby --version && gem --version && bundle --version
-
-# install things globally, for great justice and don't create ".bundle" in all our apps
-ENV GEM_HOME /usr/local/bundle
-ENV BUNDLE_PATH="$GEM_HOME" \
-	BUNDLE_SILENCE_ROOT_WARNING=1 \
-	BUNDLE_APP_CONFIG="$GEM_HOME"
-# path recommendation: https://github.com/bundler/bundler/pull/6469#issuecomment-383235438
-ENV PATH $GEM_HOME/bin:$BUNDLE_PATH/gems/bin:$PATH
-# adjust permissions of a few directories for running "gem install" as an arbitrary user
-RUN mkdir -p "$GEM_HOME" && chmod 777 "$GEM_HOME"
-# (BUNDLE_PATH = GEM_HOME, no need to mkdir/chown both)
 
 # forward request and error logs to docker log collector
 RUN ln -sf /dev/stdout /var/log/nginx/access.log && ln -sf /dev/stderr /var/log/nginx/error.log
