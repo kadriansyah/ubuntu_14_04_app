@@ -16,7 +16,9 @@ RUN set -eux; \
 	rm -rf /var/lib/apt/lists/*
 
 # grab gosu for easy step-down from root (https://github.com/tianon/gosu/releases)
-ENV GOSU_VERSION 1.10
+ENV GOSU_VERSION 1.11
+# grab "js-yaml" for parsing mongod's YAML config files (https://github.com/nodeca/js-yaml/releases)
+ENV JSYAML_VERSION 3.13.1
 
 RUN set -ex; \
 	\
@@ -39,6 +41,8 @@ RUN set -ex; \
 	rm -r "$GNUPGHOME" /usr/local/bin/gosu.asc; \
 	chmod +x /usr/local/bin/gosu; \
 	gosu nobody true; \
+	\
+	wget -O /js-yaml.js "https://github.com/nodeca/js-yaml/raw/${JSYAML_VERSION}/dist/js-yaml.js"; \
 	\
 	apt-get purge -y --auto-remove wget
 
@@ -143,7 +147,7 @@ COPY nginx.conf /etc/nginx/
 RUN set -x && apt-get install -yqq curl
 RUN groupadd --gid 1000 node && useradd --uid 1000 --gid node --shell /bin/bash --create-home node
 
-ENV NODE_VERSION 10.15.3
+ENV NODE_VERSION 10.16.3
 
 RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
   && case "${dpkgArch##*-}" in \
@@ -180,7 +184,7 @@ RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
   && rm "node-v$NODE_VERSION-linux-$ARCH.tar.gz" SHASUMS256.txt.asc SHASUMS256.txt \
   && ln -s /usr/local/bin/node /usr/local/bin/nodejs
 
-ENV YARN_VERSION 1.13.0
+ENV YARN_VERSION 1.19.1
 
 RUN set -ex \
   && for key in \
@@ -197,8 +201,7 @@ RUN set -ex \
   && ln -s /opt/yarn-v$YARN_VERSION/bin/yarnpkg /usr/local/bin/yarnpkg \
   && rm yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz
 
-# install ruby-2.6.0
-# skip installing gem documentation
+# install ruby-2.6.0 & skip installing gem documentation
 RUN mkdir -p /usr/local/etc \
 	&& { \
 		echo 'install: --no-document'; \
@@ -260,6 +263,52 @@ RUN set -ex \
 	&& rm -r /usr/src/ruby \
 # rough smoke test
 	&& ruby --version && gem --version && bundle --version
+
+# # mongodb client
+# ENV GPG_KEYS 9DA31620334BD75D9DCB49F368818C72E52529D4
+# RUN set -ex; \
+# 	export GNUPGHOME="$(mktemp -d)"; \
+# 	for key in $GPG_KEYS; do \
+# 		gpg --batch --keyserver ha.pool.sks-keyservers.net --recv-keys "$key"; \
+# 	done; \
+# 	gpg --batch --export $GPG_KEYS > /etc/apt/trusted.gpg.d/mongodb.gpg; \
+# 	command -v gpgconf && gpgconf --kill all || :; \
+# 	rm -r "$GNUPGHOME"; \
+# 	apt-key list
+
+ARG MONGO_PACKAGE=mongodb-org
+ARG MONGO_REPO=repo.mongodb.org
+ENV MONGO_PACKAGE=${MONGO_PACKAGE} MONGO_REPO=${MONGO_REPO}
+
+ENV MONGO_MAJOR 4.2
+ENV MONGO_VERSION 4.2.1
+
+RUN wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | apt-key add -
+RUN apt-get install gnupg
+RUN echo "deb [ arch=amd64,arm64 ] http://$MONGO_REPO/apt/ubuntu xenial/${MONGO_PACKAGE%}/$MONGO_MAJOR multiverse" | tee "/etc/apt/sources.list.d/${MONGO_PACKAGE%}-${MONGO_MAJOR%}.list"
+
+RUN set -x \
+	&& apt-get update \
+	&& apt-get install -y \
+		${MONGO_PACKAGE}-shell=$MONGO_VERSION \
+		${MONGO_PACKAGE}-tools=$MONGO_VERSION \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& rm -rf /var/lib/mongodb
+
+RUN set -ex \
+        \
+        && buildDeps=' \
+                gcc \
+                make \
+                libxml2 \
+                libxml2-dev \
+                libxslt1-dev \
+                zlib1g-dev \
+                wget \
+                rsync \
+        ' \
+        && apt-get update \
+		&& apt-get install -yqq --no-install-recommends $buildDeps
 
 # forward request and error logs to docker log collector
 RUN ln -sf /dev/stdout /var/log/nginx/access.log && ln -sf /dev/stderr /var/log/nginx/error.log

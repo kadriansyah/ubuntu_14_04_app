@@ -1,2 +1,2 @@
 #!/bin/bash
-docker run -d --rm --name nginx -p 80:80 kadriansyah/ubuntu_16_04_nginx:v1
+docker run -d --name nginx -p 80:80 kadriansyah/nginx-1_15_9
